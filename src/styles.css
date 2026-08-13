@@ -160,6 +160,10 @@ dialog::backdrop { background: rgb(12 28 33 / .68); }
 .dialog-alert-label span { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; color: #fff; background: #9b1c1c; border-radius: 50%; }
 .deadline-dialog-inner { background: #fff0f0; }
 .deadline-dialog-inner h2 { color: #7a1717; }
+.project-event-dialog { border-top: .55rem solid #b45309; background: #fff7e7; }
+.project-event-dialog .dialog-alert-label, .project-event-dialog h2 { color: #7a3b05; }
+.project-event-dialog .dialog-alert-label span { background: #92400e; }
+.automatic-adjustment { padding: .8rem; border: 2px solid #b45309; border-radius: .55rem; background: #fff; }
 .legend { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; padding-left: 1.2rem; }
 .completion-gate { text-align: center; }
 .completion-gate p { margin-left: auto; margin-right: auto; }

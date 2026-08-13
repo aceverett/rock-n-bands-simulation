@@ -78,6 +78,7 @@ export interface GameState {
   pendingRecoveries: PendingRecovery[];
   rulesCheckComplete: boolean;
   deadlineNoticeAcknowledged: boolean;
+  acknowledgedEventWeeks: number[];
   lastUpdate?: string;
 }
 

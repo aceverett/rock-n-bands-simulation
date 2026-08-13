@@ -118,7 +118,7 @@ test("a sixth worker is rejected immediately with specific correction guidance",
   await expect(limitDialog).toBeVisible();
   await expect(limitDialog).toContainText("weekly maximum is 5");
   await limitDialog.getByRole("button", { name: "Return to allocations" }).click();
-  await expect(page.getByRole("alert")).toContainText("weekly maximum is 5");
+  await expect(page.getByText("Allocation not changed")).toHaveCount(0);
   await expect(page.getByText("4 assigned · 1 remaining")).toBeVisible();
 });
 
@@ -136,16 +136,23 @@ test("extra charges are identified with text and high-emphasis styling", async (
   await expect(page.locator(".status-extra-charge")).toContainText("Includes extra charges");
 });
 
-test("committing a week returns focus and viewport to the new week heading", async ({ page }) => {
+test("each project change requires acknowledgment before focus returns to the new week", async ({ page }) => {
   const state = createInitialState(); state.phase = "playing";
   await page.goto("/");
   await page.evaluate((saved) => localStorage.setItem("rock-n-bands-state-v1", saved), JSON.stringify(state));
   await page.reload(); await page.getByRole("button", { name: /Resume saved simulation at Week 1/ }).click();
   await page.getByRole("button", { name: "Review week" }).click();
   await page.getByRole("button", { name: "Commit Week" }).click();
+  const updateDialog = page.getByRole("alertdialog", { name: "Security screening expands" });
+  await expect(updateDialog).toBeVisible();
+  await expect(updateDialog).toContainText("Task D now requires 4 worker-weeks instead of 3");
+  await page.keyboard.press("Escape");
+  await expect(updateDialog).toBeVisible();
+  await updateDialog.getByRole("button", { name: "Acknowledge project update" }).click();
   const heading = page.getByRole("heading", { name: "Week 2 allocation" });
   await expect(heading).toBeFocused();
   expect(await heading.evaluate((element) => element.getBoundingClientRect().top < 220)).toBe(true);
+  await expect(page.getByRole("heading", { name: "Project update" })).toHaveCount(0);
 });
 
 test("the revised Week 9 deadline requires acknowledgment and remains prominent", async ({ page }) => {
@@ -162,5 +169,5 @@ test("the revised Week 9 deadline requires acknowledgment and remains prominent"
   await expect(page.getByRole("heading", { name: "Week 6 allocation" })).toBeFocused();
   await expect(page.locator(".deadline-alert")).toContainText("Week 9");
   await expect(page.locator(".deadline-alert")).toContainText("Revised deadline");
-  await expect(page.locator(".deadline-update")).toContainText("Deadline moved forward");
+  await expect(page.getByRole("heading", { name: "Project update" })).toHaveCount(0);
 });

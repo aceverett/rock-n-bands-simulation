@@ -18,6 +18,7 @@ export function normalizeRestoredState(value: unknown): GameState | null {
   if (legacy.version !== 1 || !legacy.tasks || !Array.isArray(legacy.history)) return null;
   if (legacy.phase === "planning") legacy.phase = "playing";
   if (typeof legacy.deadlineNoticeAcknowledged !== "boolean") legacy.deadlineNoticeAcknowledged = false;
+  if (!Array.isArray(legacy.acknowledgedEventWeeks)) legacy.acknowledgedEventWeeks = legacy.deadlineNoticeAcknowledged ? [5] : [];
   delete legacy.initialPlan;
   delete legacy.reflections;
   return legacy as unknown as GameState;

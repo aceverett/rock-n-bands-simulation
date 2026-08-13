@@ -8,15 +8,15 @@ Record tester, browser/assistive technology, date, result, and notes for each re
 - [ ] Verify the skip link moves focus to the main content.
 - [ ] Confirm every focus indicator is clearly visible and never obscured.
 - [ ] Open/close Help and Review dialogs; confirm focus enters the dialog, stays inside, returns to the trigger, and Escape closes it.
-- [ ] Trigger an invalid allocation and confirm focus moves to the error summary.
-- [ ] Commit a week and confirm focus moves to the project-update heading.
+- [ ] Trigger an invalid allocation and confirm the modal warning appears immediately, then returns focus to the rejected control.
+- [ ] Commit a week with a scheduled change and confirm its modal warning cannot be dismissed without acknowledgment; after acknowledgment, confirm focus moves to the new-week heading or a genuine Capacity Recovery choice.
 
 ## Screen reader
 
 - [ ] Confirm landmarks, page title, heading hierarchy, tables, and form labels are announced coherently.
 - [ ] Confirm task state and progress are understandable without color.
 - [ ] Confirm locked-task reasons and allocation instructions are announced.
-- [ ] Confirm project updates are announced once without excessive interruption.
+- [ ] Confirm project-change dialogs are announced once with their title and changed duration or deadline.
 - [ ] Confirm the SVG has a useful title/description and the adjacent table provides equivalent content.
 
 ## Zoom, reflow, and display preferences

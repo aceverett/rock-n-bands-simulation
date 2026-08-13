@@ -37,12 +37,14 @@ export function createInitialState(): GameState {
     pendingRecoveries: [],
     rulesCheckComplete: false,
     deadlineNoticeAcknowledged: false,
+    acknowledgedEventWeeks: [],
   };
 }
 
-export function acknowledgeDeadlineNotice(input: GameState): GameState {
+export function acknowledgeProjectEvent(input: GameState, afterWeek: number): GameState {
   const state = clone(input);
-  state.deadlineNoticeAcknowledged = true;
+  if (!state.acknowledgedEventWeeks.includes(afterWeek)) state.acknowledgedEventWeeks.push(afterWeek);
+  if (afterWeek === 5) state.deadlineNoticeAcknowledged = true;
   return state;
 }
 
@@ -200,8 +202,12 @@ export function commitWeek(input: GameState, allocation: Allocation): GameState 
   record.availableNextWeek = getEligibleTasks(state);
   state.lastUpdate = `Week ${record.week} committed. ${completedTasks.length ? `Completed: ${completedTasks.join(", ")}.` : "No tasks completed."}${record.event ? ` Update: ${record.event.message}` : ""}`;
   state.currentWeek += 1;
-  if (allTasksComplete(state)) state.phase = "complete";
-  return state;
+  let resolvedState = state;
+  while (resolvedState.pendingRecoveries[0]?.eligibleTargets.length === 0) {
+    resolvedState = resolveCapacityRecovery(resolvedState);
+  }
+  if (allTasksComplete(resolvedState)) resolvedState.phase = "complete";
+  return resolvedState;
 }
 
 export function resolveCapacityRecovery(input: GameState, reassignedTo?: TaskId): GameState {

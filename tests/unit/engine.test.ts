@@ -82,10 +82,21 @@ describe("authoritative rules engine", () => {
     state = commitWeek(state, { C: 2, D: 2 });
     state = commitWeek(state, { A: 1, D: 2 });
     state = commitWeek(state, { F: 2, H: 2 });
-    state = commitWeek(state, { F: 2, H: 1 });
+    state = commitWeek(state, { F: 1, H: 1 });
     expect(state.pendingRecoveries[0]).toMatchObject({ sourceTask: "H", historicalWeek: 4 });
+    expect(state.pendingRecoveries[0]?.eligibleTargets).toContain("F");
     expect(() => resolveCapacityRecovery(state, "I")).toThrow(/not eligible/);
     expect(resolveCapacityRecovery(state).pendingRecoveries).toHaveLength(0);
+  });
+
+  it("automatically resolves capacity recovery when no valid reassignment target exists", () => {
+    let state = playing();
+    state = commitWeek(state, { C: 2, D: 2 });
+    state = commitWeek(state, { B: 2, D: 2 });
+    state = commitWeek(state, { B: 1, F: 2, H: 2 });
+    state = commitWeek(state, { A: 2, F: 2, H: 1 });
+    expect(state.pendingRecoveries).toHaveLength(0);
+    expect(state.recoveries.at(-1)).toMatchObject({ sourceTask: "H", historicalWeek: 4, leftUnused: true });
   });
 
   it("produces deterministic Week 9, Week 10, and Week 11 fixtures", () => {

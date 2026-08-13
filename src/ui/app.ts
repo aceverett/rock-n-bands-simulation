@@ -1,6 +1,6 @@
 import { TASK_BY_ID } from "../domain/config";
 import {
-  acknowledgeDeadlineNotice,
+  acknowledgeProjectEvent,
   beginBriefing,
   calculateCosts,
   commitWeek,
@@ -42,11 +42,11 @@ export class RockNBandsApp {
     this.root.addEventListener("change", (event) => this.onChange(event));
     this.root.addEventListener("submit", (event) => this.onSubmit(event));
     this.root.addEventListener("cancel", (event) => {
-      if ((event.target as HTMLDialogElement).id === "deadline-dialog") event.preventDefault();
+      if (["deadline-dialog", "event-dialog"].includes((event.target as HTMLDialogElement).id)) event.preventDefault();
     }, true);
     window.addEventListener("beforeunload", () => this.lms.terminate());
     this.render();
-    queueMicrotask(() => this.showPendingDeadlineNotice());
+    queueMicrotask(() => this.showPendingProjectUpdate());
   }
 
   private persist(commitLms = false): void {
@@ -126,12 +126,10 @@ export class RockNBandsApp {
 
   private gameView(): string {
     const last = this.state.history.at(-1);
-    const deadlineChanged = last?.event?.deadline === 9;
+    const recentRecovery = last?.event ? this.state.recoveries.find((item) => item.eventAfterWeek === last.event?.afterWeek) : undefined;
     return `<section class="dashboard" aria-labelledby="dashboard-title">
       <div class="dashboard-heading"><div><p class="eyebrow">Festival operations</p><h1 id="dashboard-title" tabindex="-1">Week ${this.state.currentWeek} allocation</h1></div><button class="button button-quiet" type="button" data-action="restart">Restart</button></div>
       ${this.statusBar()}
-      <div id="allocation-error-region">${this.allocationError ? `<section class="error-summary inline-error" role="alert"><h2>Allocation not changed</h2><p>${escapeHtml(this.allocationError)}</p></section>` : ""}</div>
-      ${this.state.lastUpdate ? `<section class="project-update ${deadlineChanged ? "deadline-update" : ""}" aria-live="polite" aria-atomic="true"><h2 id="update-heading">${deadlineChanged ? "Urgent project update" : "Project update"}</h2><p>${escapeHtml(this.state.lastUpdate)}</p>${last?.event ? `<p class="event"><strong>${escapeHtml(last.event.title)}:</strong> ${escapeHtml(last.event.message)}</p>` : ""}</section>` : ""}
       ${this.state.pendingRecoveries.length ? this.recoveryView() : `<div class="dashboard-layout"><section aria-labelledby="tasks-title"><div class="section-heading"><div><h2 id="tasks-title">Project activities</h2><p>Choose 0, 1, or 2 workers for each eligible task.</p></div>${this.viewToggle()}</div>
         ${this.projectView === "network" ? networkDiagram(this.state) : this.taskCards()}
         ${this.projectView === "network" ? `<details class="task-controls"><summary><span class="task-controls-kicker">Required action</span><strong>Open allocation controls</strong><span>Select workers for eligible tasks before reviewing the week.</span></summary>${this.taskCards()}</details>` : ""}
@@ -139,6 +137,7 @@ export class RockNBandsApp {
       ${this.logView()}
       <dialog id="review-dialog" aria-labelledby="review-title"><div class="dialog-inner"><h2 id="review-title">Review Week ${this.state.currentWeek}</h2><div id="review-content"></div><div class="button-row"><button class="button button-primary" type="button" data-action="commit">Commit Week</button><button class="button button-secondary" type="button" data-action="close-review">Return to allocations</button></div></div></dialog>
       <dialog id="limit-dialog" role="alertdialog" aria-labelledby="limit-dialog-title" aria-describedby="limit-dialog-message"><div class="dialog-inner warning-dialog"><p class="dialog-alert-label"><span aria-hidden="true">!</span> Action not allowed</p><h2 id="limit-dialog-title">Worker limit reached</h2><p id="limit-dialog-message"></p><button class="button button-primary" type="button" data-action="close-limit">Return to allocations</button></div></dialog>
+      ${last?.event && !last.event.deadline ? `<dialog id="event-dialog" role="alertdialog" aria-labelledby="event-dialog-title" aria-describedby="event-dialog-message"><div class="dialog-inner project-event-dialog"><p class="dialog-alert-label"><span aria-hidden="true">!</span> Project conditions changed</p><h2 id="event-dialog-title">${escapeHtml(last.event.title)}</h2><p id="event-dialog-message">${escapeHtml(last.event.message)}</p>${recentRecovery ? `<p class="automatic-adjustment"><strong>Automatic cost correction:</strong> ${escapeHtml(recentRecovery.message)} The historical cost was recalculated because no valid reassignment target was available.</p>` : ""}<button class="button button-primary" type="button" data-action="acknowledge-event">Acknowledge project update</button></div></dialog>` : ""}
       <dialog id="deadline-dialog" role="alertdialog" aria-labelledby="deadline-dialog-title" aria-describedby="deadline-dialog-message"><div class="dialog-inner deadline-dialog-inner"><p class="dialog-alert-label"><span aria-hidden="true">!</span> Schedule warning</p><h2 id="deadline-dialog-title">Deadline moved forward to Week 9</h2><p id="deadline-dialog-message">The contractual deadline is now the end of Week 9. Any week committed after Week 9 incurs a $2,000 late penalty.</p><p>You must acknowledge this schedule change before continuing.</p><button class="button button-primary" type="button" data-action="acknowledge-deadline">I understand the new deadline</button></div></dialog>
     </section>`;
   }
@@ -171,7 +170,7 @@ export class RockNBandsApp {
 
   private recoveryView(): string {
     const recovery = this.state.pendingRecoveries[0]!;
-    return `<section class="recovery" aria-labelledby="recovery-title"><p class="eyebrow">Controlled historical adjustment</p><h2 id="recovery-title">Capacity Recovery</h2>
+    return `<section class="recovery" aria-labelledby="recovery-title"><p class="eyebrow">Controlled historical adjustment</p><h2 id="recovery-title" tabindex="-1">Capacity Recovery</h2>
       <p>A duration reduction made the first unnecessary worker-week visible on Task ${recovery.sourceTask} in historical Week ${recovery.historicalWeek}. Reassign that one unit only to a task that was eligible at the start of that week, or remove its cost by leaving it unused.</p>
       <form id="recovery-form"><fieldset><legend>Recovered worker-week decision</legend>
         ${recovery.eligibleTargets.map((id) => `<label class="radio-card"><input type="radio" name="target" value="${id}"><span><strong>Task ${id}</strong> — ${escapeHtml(TASK_BY_ID[id].description)}</span></label>`).join("")}
@@ -228,7 +227,7 @@ export class RockNBandsApp {
     if (action === "help") (this.root.querySelector("#help-dialog") as HTMLDialogElement).showModal();
     if (action === "close-help") (this.root.querySelector("#help-dialog") as HTMLDialogElement).close();
     if (action === "begin") this.beginNew();
-    if (action === "resume" && this.resumeCandidate) { this.state = this.resumeCandidate; this.allocation = {}; this.render(); queueMicrotask(() => this.showPendingDeadlineNotice()); }
+    if (action === "resume" && this.resumeCandidate) { this.state = this.resumeCandidate; this.allocation = {}; this.render(); queueMicrotask(() => this.showPendingProjectUpdate()); }
     if (action === "briefing") { this.state.phase = "briefing"; this.render(); }
     if (action === "start-week-one") { this.state = completeRulesCheck(this.state); this.persist(true); this.allocation = {}; this.render(); }
     if (action === "view-network") { this.projectView = "network"; this.render(); }
@@ -236,7 +235,7 @@ export class RockNBandsApp {
     if (action === "review") this.openReview();
     if (action === "close-review") (this.root.querySelector("#review-dialog") as HTMLDialogElement).close();
     if (action === "close-limit") this.closeLimitDialog();
-    if (action === "acknowledge-deadline") this.acknowledgeDeadline();
+    if (action === "acknowledge-deadline" || action === "acknowledge-event") this.acknowledgeEvent();
     if (action === "commit") this.processCommit();
     if (action === "debrief") { this.state = enterDebrief(this.state); this.persist(true); this.lms.complete(this.state); this.render(); }
     if (action === "restart") this.restart();
@@ -272,8 +271,6 @@ export class RockNBandsApp {
     if (status) status.outerHTML = this.statusBar();
     const costPreview = this.root.querySelector<HTMLElement>("#cost-preview");
     if (costPreview) costPreview.innerHTML = this.costPreview();
-    const errorRegion = this.root.querySelector<HTMLElement>("#allocation-error-region");
-    if (errorRegion) errorRegion.innerHTML = this.allocationError ? `<section class="error-summary inline-error" role="alert"><h2>Allocation not changed</h2><p>${escapeHtml(this.allocationError)}</p></section>` : "";
   }
 
   private onSubmit(event: SubmitEvent): void {
@@ -285,7 +282,7 @@ export class RockNBandsApp {
       if (!value) return;
       this.state = resolveCapacityRecovery(this.state, value === "unused" ? undefined : value as TaskId);
       this.persist(true); this.render();
-      queueMicrotask(() => (this.root.querySelector("#update-heading") as HTMLElement)?.focus());
+      queueMicrotask(() => this.focusCurrentWeekHeading());
     }
   }
 
@@ -314,7 +311,7 @@ export class RockNBandsApp {
     this.persist(true);
     this.render();
     queueMicrotask(() => {
-      if (!this.showPendingDeadlineNotice()) this.focusCurrentWeekHeading();
+      if (!this.showPendingProjectUpdate()) this.focusCurrentWeekHeading();
     });
   }
 
@@ -332,19 +329,27 @@ export class RockNBandsApp {
     this.limitReturnFocus = null;
   }
 
-  private showPendingDeadlineNotice(): boolean {
-    if (this.state.phase !== "playing" || this.state.deadline !== 9 || this.state.deadlineNoticeAcknowledged) return false;
-    const dialog = this.root.querySelector<HTMLDialogElement>("#deadline-dialog");
+  private showPendingProjectUpdate(): boolean {
+    if (this.state.phase !== "playing") return false;
+    const event = this.state.history.at(-1)?.event;
+    if (!event || this.state.acknowledgedEventWeeks.includes(event.afterWeek)) return false;
+    const dialog = this.root.querySelector<HTMLDialogElement>(event.deadline ? "#deadline-dialog" : "#event-dialog");
     if (!dialog) return false;
     if (!dialog.open) dialog.showModal();
     return true;
   }
 
-  private acknowledgeDeadline(): void {
-    this.state = acknowledgeDeadlineNotice(this.state);
+  private acknowledgeEvent(): void {
+    const event = this.state.history.at(-1)?.event;
+    if (!event) return;
+    this.state = acknowledgeProjectEvent(this.state, event.afterWeek);
     this.persist(true);
-    this.root.querySelector<HTMLDialogElement>("#deadline-dialog")?.close();
-    this.focusCurrentWeekHeading();
+    this.root.querySelector<HTMLDialogElement>(event.deadline ? "#deadline-dialog" : "#event-dialog")?.close();
+    const recoveryTitle = this.root.querySelector<HTMLElement>("#recovery-title");
+    if (recoveryTitle) {
+      recoveryTitle.scrollIntoView({ block: "start", behavior: "auto" });
+      recoveryTitle.focus({ preventScroll: true });
+    } else this.focusCurrentWeekHeading();
   }
 
   private focusCurrentWeekHeading(): void {

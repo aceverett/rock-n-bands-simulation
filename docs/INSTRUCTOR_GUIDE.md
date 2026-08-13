@@ -26,7 +26,7 @@ The application applies these changes after the named week:
 | 6 | J: 4 → 5 |
 | 7 | K: 5 → 4; I: 5 → 7 |
 
-Final configured work totals 40 worker-weeks. When a reduction creates already-performed excess work, Capacity Recovery identifies the first unnecessary historical worker-week. The learner may move one unit only to a task eligible at that historical week's start, or remove the unit and associated cost. The audit log preserves the change.
+Final configured work totals 40 worker-weeks. When a reduction creates already-performed excess work, Capacity Recovery identifies the first unnecessary historical worker-week. The learner may move one unit only to a task eligible at that historical week's start, or remove the unit and associated cost. If no valid reassignment target exists, the application automatically leaves the unit unused and explains the cost correction instead of presenting a one-option decision. The audit log preserves every change.
 
 ## Debrief guidance
 

@@ -6,9 +6,9 @@
 | Atomic weekly processing and no same-week unlock | `commitWeek` in `src/domain/engine.ts` | successor-unlock unit test |
 | 0–5 workers, max 2 per task | allocation validation, native radio controls, and immediate modal limit warning | worker-limit unit tests; browser flow |
 | Labor, fifth-worker, crashing, and late costs | `calculateCosts`; text-and-icon extra-charge warnings | transparent-cost, warning-state, and late-penalty tests |
-| Correct deterministic events after Weeks 1–7 | `EVENTS` and `applyEvent` | event-order and final-configuration tests |
+| Correct deterministic events after Weeks 1–7 | `EVENTS`, `applyEvent`, and required acknowledgment dialogs | event-order, final-configuration, and browser-interaction tests |
 | Week 5 deadline becomes Week 9 | deadline event, required acknowledgment dialog, and persistent revised-deadline status | deadline and browser-interaction tests |
-| Capacity Recovery restricted by historical eligibility | pending recovery and `resolveCapacityRecovery` | prohibited-target test and audit records |
+| Capacity Recovery restricted by historical eligibility | pending recovery and `resolveCapacityRecovery`; automatic unused correction when no target exists | prohibited-target, no-choice auto-resolution, and audit-record tests |
 | Continue beyond Week 12 | unbounded `currentWeek` transition | engine has no week cap; late fixture coverage |
 | Welcome, briefing, and rules check | semantic views in `src/ui/app.ts` | Playwright browser flow |
 | Network and equivalent task-list views | `src/ui/network.ts` | axe scan; manual screen-reader checklist |

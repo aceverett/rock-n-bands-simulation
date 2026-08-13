@@ -10,7 +10,7 @@ Complete Tasks A–L while managing time and cost. You are not competing for a s
 2. Assign 0, 1, or 2 workers to eligible tasks. You may use up to five workers total.
 3. Review the full allocation and projected cost.
 4. Commit the week. All work is processed at the same time.
-5. Read the project update and inspect what becomes available next.
+5. Acknowledge any project-change warning and inspect what becomes available next.
 
 A task completed this week cannot unlock a successor until next week. Locked cards explain which predecessors remain.
 
@@ -23,7 +23,7 @@ A task completed this week cannot unlock a successor until next week. Locked car
 
 ## Capacity Recovery
 
-If a project update shortens work that is already complete, the application may recover one historical worker-week. Reassign it only among the displayed historically eligible tasks, or leave it unused to remove its cost. This is the only way a committed week can change.
+If a project update shortens work that is already complete, the application may recover one historical worker-week. When valid reassignment choices exist, reassign it only among the displayed historically eligible tasks or leave it unused to remove its cost. When no valid reassignment target exists, the application automatically leaves the worker-week unused, recalculates the historical cost, and explains the correction in the project-change warning and log. This is the only way a committed week can change.
 
 ## Save, resume, and accessibility
 

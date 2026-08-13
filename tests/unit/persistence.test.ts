@@ -24,12 +24,14 @@ describe("persistence", () => {
     state.initialPlan = { strategy: "Legacy response", allocationSketch: "Legacy sketch" };
     state.reflections = ["One", "Two", "Three"];
     delete state.deadlineNoticeAcknowledged;
+    delete state.acknowledgedEventWeeks;
     storage.setItem(SAVE_KEY, JSON.stringify(state));
     const restored = loadState(storage)! as unknown as Record<string, unknown>;
     expect(restored.phase).toBe("playing");
     expect(restored.initialPlan).toBeUndefined();
     expect(restored.reflections).toBeUndefined();
     expect(restored.deadlineNoticeAcknowledged).toBe(false);
+    expect(restored.acknowledgedEventWeeks).toEqual([]);
   });
 
   it("clears only the application save key", () => {
