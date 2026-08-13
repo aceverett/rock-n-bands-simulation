@@ -11,6 +11,8 @@ test("welcome and briefing have no automatically detectable WCAG A/AA violations
   expect(results.violations).toEqual([]);
   await page.getByRole("button", { name: "Begin new simulation" }).click();
   await expect(page.getByRole("heading", { name: "Know the operating rules" })).toBeVisible();
+  await expect(page.getByText(/organizing a university music concert/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How to navigate the simulation" })).toBeVisible();
   results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   expect(results.violations).toEqual([]);
 });
@@ -22,8 +24,12 @@ test("keyboard flow reaches Week 1 and restart requires confirmation", async ({ 
   await page.getByLabel("If C is completed this week, when can B first receive workers?").selectOption({ label: "Next week" });
   await page.getByLabel("What are the assignment limits?").selectOption({ label: "2 per task; 5 total" });
   await page.getByRole("button", { name: "Check my understanding" }).click();
-  await page.getByRole("button", { name: "Begin Week 1" }).click();
-  await expect(page.getByRole("heading", { name: "Week 1 allocation" })).toBeVisible();
+  await expect(page.getByText("3 of 3 correct.")).toBeVisible();
+  await expect(page.locator(".answer-correct")).toHaveCount(3);
+  await page.getByRole("button", { name: "Acknowledge results and begin Week 1" }).click();
+  const weekOneHeading = page.getByRole("heading", { name: "Week 1 allocation" });
+  await expect(weekOneHeading).toBeFocused();
+  expect(await weekOneHeading.evaluate((element) => element.getBoundingClientRect().top < 220)).toBe(true);
   await expect(page.getByRole("button", { name: "Task-list view" })).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/week-1-desktop.png", fullPage: true });
 
@@ -54,7 +60,7 @@ test("all weekly actions and dialogs operate from the keyboard", async ({ page }
     await select.focus(); await page.keyboard.press("ArrowDown");
   }
   await page.getByRole("button", { name: "Check my understanding" }).focus(); await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Begin Week 1" }).focus(); await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Acknowledge results and begin Week 1" }).focus(); await page.keyboard.press("Enter");
 
   await page.getByRole("radio", { name: "2", exact: true }).first().focus(); await page.keyboard.press("Space");
   await page.getByRole("button", { name: "Review week" }).focus(); await page.keyboard.press("Enter");
@@ -100,11 +106,34 @@ test("completed fixture resumes into an accessible debrief with all twelve tasks
   await page.reload();
   await page.getByRole("button", { name: /Resume saved simulation at debrief/ }).click();
   await expect(page.getByRole("heading", { name: "Project complete" })).toBeVisible();
-  await expect(page.getByText("D–F–I", { exact: false })).toBeVisible();
+  await expect(page.getByText("D–F–I", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your completed network" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Correct/reference network" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Your completed project network/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Reference on-time project network/ })).toBeVisible();
   await expect(page.locator("textarea")).toHaveCount(0);
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   expect(results.violations).toEqual([]);
   await page.screenshot({ path: "test-results/debrief-desktop.png", fullPage: true });
+});
+
+test("knowledge check identifies incorrect answers and supplies every correct answer", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Begin new simulation" }).click();
+  await page.getByLabel("Which tasks are available in Week 1?").selectOption({ label: "All tasks" });
+  await page.getByLabel("If C is completed this week, when can B first receive workers?").selectOption({ label: "Immediately" });
+  await page.getByLabel("What are the assignment limits?").selectOption({ label: "5 per task; no weekly limit" });
+  await page.getByRole("button", { name: "Check my understanding" }).click();
+  await expect(page.getByText("0 of 3 correct.")).toBeVisible();
+  await expect(page.locator(".answer-incorrect")).toHaveCount(3);
+  await expect(page.getByText("Correct answer:")).toHaveCount(3);
+  await expect(page.getByText("A, C, and D", { exact: true })).toBeVisible();
+  await expect(page.getByText("Next week", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 per task; 5 total", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Acknowledge results and begin Week 1" })).toBeVisible();
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+  expect(results.violations).toEqual([]);
+  await page.screenshot({ path: "test-results/knowledge-check-feedback.png", fullPage: true });
 });
 
 test("a sixth worker is rejected immediately with specific correction guidance", async ({ page }) => {

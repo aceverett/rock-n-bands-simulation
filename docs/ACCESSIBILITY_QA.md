@@ -17,6 +17,8 @@ Record tester, browser/assistive technology, date, result, and notes for each re
 - [ ] Confirm task state and progress are understandable without color.
 - [ ] Confirm locked-task reasons and allocation instructions are announced.
 - [ ] Confirm project-change dialogs are announced once with their title and changed duration or deadline.
+- [ ] Submit both correct and incorrect knowledge-check responses; confirm status text, symbols, answer text, and focus are understandable without color.
+- [ ] Confirm both debrief network diagrams have distinct accessible names and that completion weeks and the reference critical path are conveyed in text.
 - [ ] Confirm the SVG has a useful title/description and the adjacent table provides equivalent content.
 
 ## Zoom, reflow, and display preferences

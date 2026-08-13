@@ -18,7 +18,7 @@ import {
 import { TASK_IDS, type Allocation, type GameState, type TaskId } from "../domain/types";
 import type { LmsAdapter } from "../lms/scorm";
 import { clearState, saveState } from "../persistence/storage";
-import { dependencyTable, networkDiagram } from "./network";
+import { completedNetworkComparison, dependencyTable, networkDiagram } from "./network";
 
 const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]!);
@@ -29,6 +29,7 @@ export class RockNBandsApp {
   private allocation: Allocation = {};
   private projectView: "network" | "list" = "list";
   private rulesFeedback = false;
+  private rulesAnswers: Record<"eligible" | "unlock" | "limits", string> = { eligible: "", unlock: "", limits: "" };
   private allocationError = "";
   private limitReturnFocus: HTMLElement | null = null;
 
@@ -95,20 +96,34 @@ export class RockNBandsApp {
   private briefingView(): string {
     return `<section class="page-section" aria-labelledby="briefing-title">
       <p class="eyebrow">Project briefing</p><h1 id="briefing-title">Know the operating rules</h1>
-      <div class="briefing-grid"><article><h2>Your objective</h2><p>Complete Tasks A–L as economically as possible. The initial contractual deadline is the end of Week 10. Project conditions may change; updates are revealed only after the affected week's decisions are committed.</p></article>
+      <div class="briefing-grid"><article><h2>Your objective</h2><p>You are organizing a university music concert for Planners 'R Us. Complete every activity needed to deliver the concert—from contracting performers and roadies to building the stage, arranging security, transportation, parking, concessions, and media access.</p><p>Complete Tasks A–L as economically as possible. The initial contractual deadline is the end of Week 10. Project conditions may change; updates are revealed only after the affected week's decisions are committed.</p></article>
       <article><h2>Workers and cost</h2><ul><li>Use 0–5 workers per week; four are regular.</li><li>Assign no more than 2 workers to one task.</li><li>Each worker costs $200. The fifth adds a $100 premium.</li><li>Two workers on one task add $100 coordination cost for that task and week.</li><li>After the revised deadline, each late round costs $2,000.</li></ul></article></div>
       <aside class="callout"><h2>Weekly timing matters</h2><p>A task is eligible only when every immediate predecessor was complete by the end of the previous week. Committing applies all work simultaneously; a task completed this week never unlocks a successor until next week.</p></aside>
+      <section class="interface-guide" aria-labelledby="interface-guide-title"><h2 id="interface-guide-title">How to navigate the simulation</h2><ol><li>Use <strong>Task-list view</strong> for detailed task cards, requirements, predecessors, and worker controls.</li><li>Switch to <strong>Network view</strong> whenever you want to see how tasks connect. In Network view, open <strong>Allocation controls</strong> below the diagram to assign workers.</li><li>Select 0, 1, or 2 workers for each eligible task. The status summary and projected cost update immediately.</li><li>Select <strong>Review week</strong> to inspect the complete allocation and cost, then select <strong>Commit Week</strong> to process it.</li><li>Acknowledge project-change warnings before continuing. Use the project log to revisit earlier allocations, changes, and costs.</li></ol></section>
       ${this.viewToggle()}
       ${this.projectView === "network" ? networkDiagram(this.state) : dependencyTable(this.state)}
       ${this.projectView === "network" ? `<details><summary>Equivalent text-based dependency table</summary>${dependencyTable(this.state)}</details>` : ""}
       <section class="rules-check" aria-labelledby="check-title"><h2 id="check-title">Quick rules check</h2>
-      ${this.rulesFeedback ? `<div class="feedback" tabindex="-1" id="rules-feedback"><h3>Review</h3><p><strong>Week 1:</strong> A, C, and D are available. <strong>Unlocking:</strong> successors wait until the next week. <strong>Limits:</strong> 2 workers per task and 5 total.</p><button class="button button-primary" type="button" data-action="start-week-one">Begin Week 1</button></div>` : `<form id="rules-form">
-        <label>Which tasks are available in Week 1?<select name="eligible" required><option value="">Choose</option><option>A, C, and D</option><option>A, B, and C</option><option>All tasks</option></select></label>
-        <label>If C is completed this week, when can B first receive workers?<select name="unlock" required><option value="">Choose</option><option>Immediately</option><option>Next week</option></select></label>
-        <label>What are the assignment limits?<select name="limits" required><option value="">Choose</option><option>2 per task; 5 total</option><option>5 per task; no weekly limit</option></select></label>
+      ${this.rulesFeedback ? this.rulesCheckFeedback() : `<form id="rules-form">
+        <label>Which tasks are available in Week 1?<select name="eligible" required><option value="">Choose</option><option value="A, C, and D">A, C, and D</option><option value="A, B, and C">A, B, and C</option><option value="All tasks">All tasks</option></select></label>
+        <label>If C is completed this week, when can B first receive workers?<select name="unlock" required><option value="">Choose</option><option value="Immediately">Immediately</option><option value="Next week">Next week</option></select></label>
+        <label>What are the assignment limits?<select name="limits" required><option value="">Choose</option><option value="2 per task; 5 total">2 per task; 5 total</option><option value="5 per task; no weekly limit">5 per task; no weekly limit</option></select></label>
         <button class="button button-secondary" type="submit">Check my understanding</button>
       </form>`}</section>
     </section>`;
+  }
+
+  private rulesCheckFeedback(): string {
+    const checks = [
+      { key: "eligible" as const, question: "Which tasks are available in Week 1?", correct: "A, C, and D" },
+      { key: "unlock" as const, question: "When can B first receive workers after C is completed?", correct: "Next week" },
+      { key: "limits" as const, question: "What are the assignment limits?", correct: "2 per task; 5 total" },
+    ];
+    const correctCount = checks.filter((item) => this.rulesAnswers[item.key] === item.correct).length;
+    return `<div class="feedback knowledge-feedback" tabindex="-1" id="rules-feedback"><h3>Knowledge-check results</h3><p class="knowledge-score"><strong>${correctCount} of ${checks.length} correct.</strong> Review the correct answers below, then continue to Week 1. You do not need to retake the check.</p><ol class="knowledge-results">${checks.map((item) => {
+      const correct = this.rulesAnswers[item.key] === item.correct;
+      return `<li class="${correct ? "answer-correct" : "answer-incorrect"}"><p class="answer-status"><span aria-hidden="true">${correct ? "✓" : "!"}</span><strong>${correct ? "Correct" : "Incorrect"}</strong></p><p><strong>${escapeHtml(item.question)}</strong></p><p>Your answer: ${escapeHtml(this.rulesAnswers[item.key])}</p><p>Correct answer: <strong>${escapeHtml(item.correct)}</strong></p></li>`;
+    }).join("")}</ol><button class="button button-primary" type="button" data-action="start-week-one">Acknowledge results and begin Week 1</button></div>`;
   }
 
   private statusBar(): string {
@@ -197,6 +212,7 @@ export class RockNBandsApp {
       <section class="results-grid"><article><h2>Cost breakdown</h2><dl class="cost-list"><div><dt>Regular labor</dt><dd>${money(totals.regularLabor)}</dd></div>${this.chargeCostRow("Fifth-worker premiums", totals.fifthWorkerPremium)}${this.chargeCostRow("Crashing costs", totals.crashing)}${this.chargeCostRow("Late penalties", totals.latePenalty)}</dl></article>
       <article><h2>Decision summary</h2><dl class="cost-list"><div><dt>Weeks committed</dt><dd>${this.state.history.length}</dd></div><div><dt>Capacity recoveries</dt><dd>${this.state.recoveries.length}</dd></div><div><dt>Tasks completed</dt><dd>12 of 12</dd></div><div><dt>Final deadline</dt><dd>Week ${this.state.deadline}</dd></div></dl></article></section>
       <section class="debrief"><h2>What the network reveals</h2><p>The initial critical path was <strong>D–F–I</strong> at 12 uncompressed weeks. The deterministic changes increased that same path to 16 uncompressed weeks: D grew to 4, F to 5, and I to 7 worker-weeks.</p><p>That path deserved attention, but it was not the only schedule risk. Work on A–E–G–K, C–B–J, D–H–J, and D–F–L still controlled when downstream tasks could start. Balancing expected completion times across connected paths can therefore outperform reacting to whichever isolated task looks longest.</p><p>Using extra workers early can buy schedule flexibility, but it also adds fifth-worker and coordination costs. Waiting may save those costs in the short run while increasing exposure to $2,000 late rounds. Uncertainty makes an initial plan useful as a hypothesis—not a promise.</p></section>
+      ${completedNetworkComparison(this.state)}
       <section aria-labelledby="history-title"><h2 id="history-title">Week-by-week history</h2>${this.historyTable()}</section>
       <div class="button-row print-actions"><button class="button button-secondary" type="button" data-action="download">Download readable summary</button><button class="button button-secondary" type="button" data-action="print">Print results</button><button class="button button-quiet" type="button" data-action="restart">Restart simulation</button>${referrer ? `<a class="button button-primary" href="${escapeHtml(referrer)}" target="_top">Return to Canvas</a>` : ""}</div>
       ${!referrer ? `<p class="fine-print">No Canvas return address is available in this standalone session. Close this tab or use your browser's Back control.</p>` : ""}
@@ -229,7 +245,7 @@ export class RockNBandsApp {
     if (action === "begin") this.beginNew();
     if (action === "resume" && this.resumeCandidate) { this.state = this.resumeCandidate; this.allocation = {}; this.render(); queueMicrotask(() => this.showPendingProjectUpdate()); }
     if (action === "briefing") { this.state.phase = "briefing"; this.render(); }
-    if (action === "start-week-one") { this.state = completeRulesCheck(this.state); this.persist(true); this.allocation = {}; this.render(); }
+    if (action === "start-week-one") { this.state = completeRulesCheck(this.state); this.persist(true); this.allocation = {}; this.render(); queueMicrotask(() => this.focusCurrentWeekHeading()); }
     if (action === "view-network") { this.projectView = "network"; this.render(); }
     if (action === "view-list") { this.projectView = "list"; this.render(); }
     if (action === "review") this.openReview();
@@ -276,7 +292,12 @@ export class RockNBandsApp {
   private onSubmit(event: SubmitEvent): void {
     const form = event.target as HTMLFormElement;
     event.preventDefault();
-    if (form.id === "rules-form") { this.rulesFeedback = true; this.render(); queueMicrotask(() => (this.root.querySelector("#rules-feedback") as HTMLElement)?.focus()); }
+    if (form.id === "rules-form") {
+      const data = new FormData(form);
+      this.rulesAnswers = { eligible: String(data.get("eligible") ?? ""), unlock: String(data.get("unlock") ?? ""), limits: String(data.get("limits") ?? "") };
+      this.rulesFeedback = true; this.render();
+      queueMicrotask(() => (this.root.querySelector("#rules-feedback") as HTMLElement)?.focus());
+    }
     if (form.id === "recovery-form") {
       const value = String(new FormData(form).get("target") ?? "");
       if (!value) return;

@@ -4,6 +4,8 @@
 
 Complete Tasks A–L while managing time and cost. You are not competing for a secret “best” cost. The point is to make defensible decisions, respond to changes, and reflect on whole project paths.
 
+The project is to organize a university music concert. Before Week 1, the briefing explains the interface and gives a short knowledge check. Each answer is marked correct or incorrect, every correct answer is provided, and you may acknowledge the feedback and continue without retaking the check.
+
 ## Each week
 
 1. Review which tasks are available, in progress, locked, or complete.
@@ -28,3 +30,5 @@ If a project update shortens work that is already complete, the application may 
 ## Save, resume, and accessibility
 
 Committed weeks autosave. In a standalone browser session, progress remains on that device. In Canvas SCORM mode, progress is also committed to Canvas. Use the **Accessibility & help** control for keyboard instructions and task-state meanings. No drag-and-drop, audio, timer, or full-screen mode is required.
+
+After completing the project, the debrief compares the completion week for each task in your network with one validated Week 9 reference network. The reference is a comparison model; it is not the only defensible allocation strategy.

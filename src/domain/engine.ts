@@ -147,19 +147,25 @@ function applyEvent(state: GameState, record: WeekRecord): void {
     const oldCompleted = task.completed;
     task.required = change.duration;
 
-    if (change.duration < oldRequired && oldCompleted > change.duration) {
-      const historicalWeek = findFirstUnnecessaryWeek(state.history, change.taskId, change.duration);
-      task.completed = change.duration;
-      if (historicalWeek !== undefined) {
-        const historicalRecord = state.history.find((item) => item.week === historicalWeek);
-        if (historicalRecord) {
-          const pending: PendingRecovery = {
-            sourceTask: change.taskId,
-            historicalWeek,
-            eventAfterWeek: record.week,
-            eligibleTargets: recoveryTargets(state, historicalRecord, change.taskId),
-          };
-          state.pendingRecoveries.push(pending);
+    if (change.duration < oldRequired) {
+      if (oldCompleted >= change.duration && !task.completedWeek) {
+        task.completedWeek = record.week;
+        if (!record.completedTasks.includes(change.taskId)) record.completedTasks.push(change.taskId);
+      }
+      if (oldCompleted > change.duration) {
+        const historicalWeek = findFirstUnnecessaryWeek(state.history, change.taskId, change.duration);
+        task.completed = change.duration;
+        if (historicalWeek !== undefined) {
+          const historicalRecord = state.history.find((item) => item.week === historicalWeek);
+          if (historicalRecord) {
+            const pending: PendingRecovery = {
+              sourceTask: change.taskId,
+              historicalWeek,
+              eventAfterWeek: record.week,
+              eligibleTargets: recoveryTargets(state, historicalRecord, change.taskId),
+            };
+            state.pendingRecoveries.push(pending);
+          }
         }
       }
     } else if (change.duration > oldRequired && task.completed < change.duration) {

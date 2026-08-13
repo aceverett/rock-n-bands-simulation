@@ -70,6 +70,16 @@ describe("authoritative rules engine", () => {
     expect(state.tasks).toMatchObject({ B: { required: 3 }, D: { required: 4 }, E: { required: 2 }, F: { required: 5 }, H: { required: 2 }, I: { required: 7 }, J: { required: 5 }, K: { required: 4 } });
   });
 
+  it("records the event week when a duration reduction completes a task", () => {
+    let state = playing();
+    state = commitWeek(state, { C: 2, D: 2 });
+    state = commitWeek(state, { D: 2 });
+    state = commitWeek(state, { H: 2 });
+    state = commitWeek(state, {});
+    expect(state.tasks.H.completedWeek).toBe(4);
+    expect(state.history[3]?.completedTasks).toContain("H");
+  });
+
   it("has 38 initial and 40 final worker-weeks", () => {
     expect(TASKS.reduce((sum, task) => sum + task.initialDuration, 0)).toBe(38);
     let state = playing();

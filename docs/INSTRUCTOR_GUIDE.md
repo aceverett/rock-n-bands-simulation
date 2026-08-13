@@ -4,6 +4,8 @@
 
 Rock'n Bands is a mastery-oriented simulation for an asynchronous project-management course. A first attempt is designed for about 30–40 minutes without a timer. Learners independently allocate workers, respond to deterministic changes, and review their results. Written reflection is intentionally left to a separate Canvas assignment.
 
+The briefing identifies the project as organizing a university music concert and introduces both Task-list and Network views. The initial knowledge check reports each response as correct or incorrect, supplies every correct answer, and allows the learner to acknowledge the feedback and proceed without retaking it.
+
 ## Corrected rules used by the application
 
 All twelve tasks A–L are required. Initial durations total 38 worker-weeks. The Week 1 eligible set is exactly A, C, and D. Eligibility is evaluated once at the start of a week, so same-week completion never unlocks a successor.
@@ -31,6 +33,8 @@ Final configured work totals 40 worker-weeks. When a reduction creates already-p
 ## Debrief guidance
 
 Do not reveal the critical path before or during play. The debrief identifies D–F–I as the initial 12-week critical path and shows how deterministic changes expand it to 16 uncompressed weeks. Emphasize that other paths remain schedule-sensitive and that balancing expected path completion can be more effective than managing isolated activities.
+
+The debrief compares the learner's task-completion weeks with one validated Week 9 reference network. The reference is an authoritative comparison model, not a claim that only one worker-allocation sequence is correct.
 
 Project cost is feedback, not a punitive grade. Finishing late does not fail the learner. SCORM completion reports 100 only for completing the simulation and reaching the debrief.
 
