@@ -36,7 +36,14 @@ export function createInitialState(): GameState {
     recoveries: [],
     pendingRecoveries: [],
     rulesCheckComplete: false,
+    deadlineNoticeAcknowledged: false,
   };
+}
+
+export function acknowledgeDeadlineNotice(input: GameState): GameState {
+  const state = clone(input);
+  state.deadlineNoticeAcknowledged = true;
+  return state;
 }
 
 export function isComplete(state: GameState, taskId: TaskId): boolean {

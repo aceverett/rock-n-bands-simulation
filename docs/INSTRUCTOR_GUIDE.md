@@ -10,7 +10,9 @@ All twelve tasks A–L are required. Initial durations total 38 worker-weeks. Th
 
 Learners may use 0–5 workers weekly, assign no more than two to a task, and generate one worker-week of progress per assigned worker. Labor is $200 per worker. A fifth worker adds a $100 premium. Each task receiving two workers adds a separate $100 coordination/crashing charge.
 
-The initial deadline is Week 10. After Week 5 it becomes Week 9. Each round after Week 9 adds a $2,000 penalty. Play continues beyond Week 12 when required.
+Attempting to exceed five workers opens an immediate modal warning and leaves the prior valid allocation unchanged. Active premium, crashing, and late-penalty rows use warning text and an icon in addition to color, so the meaning does not depend on color perception.
+
+The initial deadline is Week 10. After Week 5 it becomes Week 9. Learners must acknowledge a modal schedule warning before continuing, and the revised deadline remains highlighted in the status summary. Each round after Week 9 adds a $2,000 penalty. Play continues beyond Week 12 when required. After each committed week, focus and scroll position return to the new week heading; for the deadline-change week, this happens after acknowledgment.
 
 The application applies these changes after the named week:
 

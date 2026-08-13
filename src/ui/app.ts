@@ -1,5 +1,6 @@
 import { TASK_BY_ID } from "../domain/config";
 import {
+  acknowledgeDeadlineNotice,
   beginBriefing,
   calculateCosts,
   commitWeek,
@@ -29,6 +30,7 @@ export class RockNBandsApp {
   private projectView: "network" | "list" = "list";
   private rulesFeedback = false;
   private allocationError = "";
+  private limitReturnFocus: HTMLElement | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -39,8 +41,12 @@ export class RockNBandsApp {
     this.root.addEventListener("click", (event) => this.onClick(event));
     this.root.addEventListener("change", (event) => this.onChange(event));
     this.root.addEventListener("submit", (event) => this.onSubmit(event));
+    this.root.addEventListener("cancel", (event) => {
+      if ((event.target as HTMLDialogElement).id === "deadline-dialog") event.preventDefault();
+    }, true);
     window.addEventListener("beforeunload", () => this.lms.terminate());
     this.render();
+    queueMicrotask(() => this.showPendingDeadlineNotice());
   }
 
   private persist(commitLms = false): void {
@@ -109,26 +115,31 @@ export class RockNBandsApp {
     const assigned = TASK_IDS.reduce((sum, id) => sum + (this.allocation[id] ?? 0), 0);
     const costs = calculateCosts(this.allocation, this.state.currentWeek, this.state.deadline);
     const complete = TASK_IDS.filter((id) => isComplete(this.state, id)).length;
+    const extraCharges = costs.fifthWorkerPremium + costs.crashing + costs.latePenalty;
+    const revisedDeadline = this.state.deadline === 9;
     return `<section class="status-bar" aria-label="Project status">
-      <div><span>Current week</span><strong>${this.state.currentWeek}</strong></div><div><span>Deadline</span><strong>Week ${this.state.deadline}</strong></div>
-      <div><span>Workers</span><strong>${assigned} assigned · ${5 - assigned} remaining</strong></div><div><span>Projected week</span><strong>${money(costs.total)}</strong></div>
+      <div><span>Current week</span><strong>${this.state.currentWeek}</strong></div><div class="${revisedDeadline ? "deadline-alert" : ""}"><span>Deadline</span><strong>Week ${this.state.deadline}</strong>${revisedDeadline ? `<small><span aria-hidden="true">!</span> Revised deadline</small>` : ""}</div>
+      <div><span>Workers</span><strong>${assigned} assigned · ${5 - assigned} remaining</strong></div><div class="${extraCharges > 0 ? "status-extra-charge" : ""}"><span>Projected week</span><strong>${money(costs.total)}</strong>${extraCharges > 0 ? `<small><span aria-hidden="true">!</span> Includes extra charges</small>` : ""}</div>
       <div><span>Cumulative</span><strong>${money(totalCosts(this.state).total)}</strong></div><div><span>Complete</span><strong>${complete} / 12</strong></div>
     </section>`;
   }
 
   private gameView(): string {
     const last = this.state.history.at(-1);
+    const deadlineChanged = last?.event?.deadline === 9;
     return `<section class="dashboard" aria-labelledby="dashboard-title">
-      <div class="dashboard-heading"><div><p class="eyebrow">Festival operations</p><h1 id="dashboard-title">Week ${this.state.currentWeek} allocation</h1></div><button class="button button-quiet" type="button" data-action="restart">Restart</button></div>
+      <div class="dashboard-heading"><div><p class="eyebrow">Festival operations</p><h1 id="dashboard-title" tabindex="-1">Week ${this.state.currentWeek} allocation</h1></div><button class="button button-quiet" type="button" data-action="restart">Restart</button></div>
       ${this.statusBar()}
       <div id="allocation-error-region">${this.allocationError ? `<section class="error-summary inline-error" role="alert"><h2>Allocation not changed</h2><p>${escapeHtml(this.allocationError)}</p></section>` : ""}</div>
-      ${this.state.lastUpdate ? `<section class="project-update" aria-live="polite" aria-atomic="true"><h2 id="update-heading" tabindex="-1">Project update</h2><p>${escapeHtml(this.state.lastUpdate)}</p>${last?.event ? `<p class="event"><strong>${escapeHtml(last.event.title)}:</strong> ${escapeHtml(last.event.message)}</p>` : ""}</section>` : ""}
+      ${this.state.lastUpdate ? `<section class="project-update ${deadlineChanged ? "deadline-update" : ""}" aria-live="polite" aria-atomic="true"><h2 id="update-heading">${deadlineChanged ? "Urgent project update" : "Project update"}</h2><p>${escapeHtml(this.state.lastUpdate)}</p>${last?.event ? `<p class="event"><strong>${escapeHtml(last.event.title)}:</strong> ${escapeHtml(last.event.message)}</p>` : ""}</section>` : ""}
       ${this.state.pendingRecoveries.length ? this.recoveryView() : `<div class="dashboard-layout"><section aria-labelledby="tasks-title"><div class="section-heading"><div><h2 id="tasks-title">Project activities</h2><p>Choose 0, 1, or 2 workers for each eligible task.</p></div>${this.viewToggle()}</div>
         ${this.projectView === "network" ? networkDiagram(this.state) : this.taskCards()}
         ${this.projectView === "network" ? `<details class="task-controls"><summary><span class="task-controls-kicker">Required action</span><strong>Open allocation controls</strong><span>Select workers for eligible tasks before reviewing the week.</span></summary>${this.taskCards()}</details>` : ""}
       </section><aside class="commit-panel" aria-labelledby="cost-title"><div id="cost-preview">${this.costPreview()}</div><button class="button button-primary button-block" type="button" data-action="review">Review week</button><p class="fine-print">Nothing is processed until you review and commit the entire week.</p></aside></div>`}
       ${this.logView()}
       <dialog id="review-dialog" aria-labelledby="review-title"><div class="dialog-inner"><h2 id="review-title">Review Week ${this.state.currentWeek}</h2><div id="review-content"></div><div class="button-row"><button class="button button-primary" type="button" data-action="commit">Commit Week</button><button class="button button-secondary" type="button" data-action="close-review">Return to allocations</button></div></div></dialog>
+      <dialog id="limit-dialog" role="alertdialog" aria-labelledby="limit-dialog-title" aria-describedby="limit-dialog-message"><div class="dialog-inner warning-dialog"><p class="dialog-alert-label"><span aria-hidden="true">!</span> Action not allowed</p><h2 id="limit-dialog-title">Worker limit reached</h2><p id="limit-dialog-message"></p><button class="button button-primary" type="button" data-action="close-limit">Return to allocations</button></div></dialog>
+      <dialog id="deadline-dialog" role="alertdialog" aria-labelledby="deadline-dialog-title" aria-describedby="deadline-dialog-message"><div class="dialog-inner deadline-dialog-inner"><p class="dialog-alert-label"><span aria-hidden="true">!</span> Schedule warning</p><h2 id="deadline-dialog-title">Deadline moved forward to Week 9</h2><p id="deadline-dialog-message">The contractual deadline is now the end of Week 9. Any week committed after Week 9 incurs a $2,000 late penalty.</p><p>You must acknowledge this schedule change before continuing.</p><button class="button button-primary" type="button" data-action="acknowledge-deadline">I understand the new deadline</button></div></dialog>
     </section>`;
   }
 
@@ -151,7 +162,11 @@ export class RockNBandsApp {
 
   private costPreview(): string {
     const costs = calculateCosts(this.allocation, this.state.currentWeek, this.state.deadline);
-    return `<h2 id="cost-title">Projected cost</h2><dl class="cost-list"><div><dt>Regular labor</dt><dd>${money(costs.regularLabor)}</dd></div><div><dt>Fifth-worker premium</dt><dd>${money(costs.fifthWorkerPremium)}</dd></div><div><dt>Coordination/crashing</dt><dd>${money(costs.crashing)}</dd></div><div><dt>Late penalty</dt><dd>${money(costs.latePenalty)}</dd></div><div class="cost-total"><dt>Total this week</dt><dd>${money(costs.total)}</dd></div></dl>`;
+    return `<h2 id="cost-title">Projected cost</h2><dl class="cost-list"><div><dt>Regular labor</dt><dd>${money(costs.regularLabor)}</dd></div>${this.chargeCostRow("Fifth-worker premium", costs.fifthWorkerPremium)}${this.chargeCostRow("Coordination/crashing", costs.crashing)}${this.chargeCostRow("Late penalty", costs.latePenalty)}<div class="cost-total"><dt>Total this week</dt><dd>${money(costs.total)}</dd></div></dl>`;
+  }
+
+  private chargeCostRow(label: string, value: number): string {
+    return `<div class="${value > 0 ? "charge-active" : ""}"><dt>${value > 0 ? `<span class="charge-icon" aria-hidden="true">!</span>` : ""}${label}${value > 0 ? `<span class="charge-badge">Extra charge</span>` : ""}</dt><dd>${money(value)}</dd></div>`;
   }
 
   private recoveryView(): string {
@@ -171,7 +186,7 @@ export class RockNBandsApp {
 
   private completionGateView(): string {
     const completionWeek = this.state.history.at(-1)?.week ?? 0;
-    return `<section class="completion-gate narrow" aria-labelledby="complete-title"><p class="eyebrow">All activities complete</p><h1 id="complete-title">The festival project finished in Week ${completionWeek}.</h1><p>${completionWeek <= this.state.deadline ? "You met the revised deadline." : `You finished ${completionWeek - this.state.deadline} week${completionWeek - this.state.deadline === 1 ? "" : "s"} after the revised deadline.`} Open the debrief to review the path implications, full cost, and your decisions.</p><button class="button button-primary" type="button" data-action="debrief">Open results and debrief</button></section>`;
+    return `<section class="completion-gate narrow" aria-labelledby="complete-title"><p class="eyebrow">All activities complete</p><h1 id="complete-title" tabindex="-1">The festival project finished in Week ${completionWeek}.</h1><p>${completionWeek <= this.state.deadline ? "You met the revised deadline." : `You finished ${completionWeek - this.state.deadline} week${completionWeek - this.state.deadline === 1 ? "" : "s"} after the revised deadline.`} Open the debrief to review the path implications, full cost, and your decisions.</p><button class="button button-primary" type="button" data-action="debrief">Open results and debrief</button></section>`;
   }
 
   private debriefView(): string {
@@ -180,7 +195,7 @@ export class RockNBandsApp {
     const referrer = document.referrer;
     return `<section class="results" aria-labelledby="results-title"><p class="eyebrow">Results and debrief</p><h1 id="results-title">Project complete</h1>
       <section class="result-cards" aria-label="Project results"><div><span>Completion</span><strong>Week ${completionWeek}</strong></div><div><span>Schedule</span><strong>${completionWeek <= this.state.deadline ? "On time" : "Late"}</strong></div><div><span>Total cost</span><strong>${money(totals.total)}</strong></div></section>
-      <section class="results-grid"><article><h2>Cost breakdown</h2><dl class="cost-list"><div><dt>Regular labor</dt><dd>${money(totals.regularLabor)}</dd></div><div><dt>Fifth-worker premiums</dt><dd>${money(totals.fifthWorkerPremium)}</dd></div><div><dt>Crashing costs</dt><dd>${money(totals.crashing)}</dd></div><div><dt>Late penalties</dt><dd>${money(totals.latePenalty)}</dd></div></dl></article>
+      <section class="results-grid"><article><h2>Cost breakdown</h2><dl class="cost-list"><div><dt>Regular labor</dt><dd>${money(totals.regularLabor)}</dd></div>${this.chargeCostRow("Fifth-worker premiums", totals.fifthWorkerPremium)}${this.chargeCostRow("Crashing costs", totals.crashing)}${this.chargeCostRow("Late penalties", totals.latePenalty)}</dl></article>
       <article><h2>Decision summary</h2><dl class="cost-list"><div><dt>Weeks committed</dt><dd>${this.state.history.length}</dd></div><div><dt>Capacity recoveries</dt><dd>${this.state.recoveries.length}</dd></div><div><dt>Tasks completed</dt><dd>12 of 12</dd></div><div><dt>Final deadline</dt><dd>Week ${this.state.deadline}</dd></div></dl></article></section>
       <section class="debrief"><h2>What the network reveals</h2><p>The initial critical path was <strong>D–F–I</strong> at 12 uncompressed weeks. The deterministic changes increased that same path to 16 uncompressed weeks: D grew to 4, F to 5, and I to 7 worker-weeks.</p><p>That path deserved attention, but it was not the only schedule risk. Work on A–E–G–K, C–B–J, D–H–J, and D–F–L still controlled when downstream tasks could start. Balancing expected completion times across connected paths can therefore outperform reacting to whichever isolated task looks longest.</p><p>Using extra workers early can buy schedule flexibility, but it also adds fifth-worker and coordination costs. Waiting may save those costs in the short run while increasing exposure to $2,000 late rounds. Uncertainty makes an initial plan useful as a hypothesis—not a promise.</p></section>
       <section aria-labelledby="history-title"><h2 id="history-title">Week-by-week history</h2>${this.historyTable()}</section>
@@ -213,13 +228,15 @@ export class RockNBandsApp {
     if (action === "help") (this.root.querySelector("#help-dialog") as HTMLDialogElement).showModal();
     if (action === "close-help") (this.root.querySelector("#help-dialog") as HTMLDialogElement).close();
     if (action === "begin") this.beginNew();
-    if (action === "resume" && this.resumeCandidate) { this.state = this.resumeCandidate; this.allocation = {}; this.render(); }
+    if (action === "resume" && this.resumeCandidate) { this.state = this.resumeCandidate; this.allocation = {}; this.render(); queueMicrotask(() => this.showPendingDeadlineNotice()); }
     if (action === "briefing") { this.state.phase = "briefing"; this.render(); }
     if (action === "start-week-one") { this.state = completeRulesCheck(this.state); this.persist(true); this.allocation = {}; this.render(); }
     if (action === "view-network") { this.projectView = "network"; this.render(); }
     if (action === "view-list") { this.projectView = "list"; this.render(); }
     if (action === "review") this.openReview();
     if (action === "close-review") (this.root.querySelector("#review-dialog") as HTMLDialogElement).close();
+    if (action === "close-limit") this.closeLimitDialog();
+    if (action === "acknowledge-deadline") this.acknowledgeDeadline();
     if (action === "commit") this.processCommit();
     if (action === "debrief") { this.state = enterDebrief(this.state); this.persist(true); this.lms.complete(this.state); this.render(); }
     if (action === "restart") this.restart();
@@ -240,11 +257,13 @@ export class RockNBandsApp {
         input.checked = false;
         const previousInput = this.root.querySelector<HTMLInputElement>(`input[name="task-${id}"][value="${previous}"]`);
         if (previousInput) previousInput.checked = true;
+        this.limitReturnFocus = input;
       } else {
         this.allocation = candidate;
         this.allocationError = "";
       }
       this.refreshAllocationSummary();
+      if (total > 5) this.showLimitDialog();
     }
   }
 
@@ -284,7 +303,7 @@ export class RockNBandsApp {
     }
     const costs = calculateCosts(this.allocation, this.state.currentWeek, this.state.deadline);
     const content = this.root.querySelector("#review-content")!;
-    content.innerHTML = `<p><strong>Assignments:</strong> ${this.allocationText(this.allocation)}</p><p><strong>Total workers:</strong> ${TASK_IDS.reduce((sum, id) => sum + (this.allocation[id] ?? 0), 0)}</p><dl class="cost-list"><div><dt>Regular labor</dt><dd>${money(costs.regularLabor)}</dd></div><div><dt>Fifth-worker premium</dt><dd>${money(costs.fifthWorkerPremium)}</dd></div><div><dt>Crashing</dt><dd>${money(costs.crashing)}</dd></div><div><dt>Late penalty</dt><dd>${money(costs.latePenalty)}</dd></div><div class="cost-total"><dt>Total</dt><dd>${money(costs.total)}</dd></div></dl>`;
+    content.innerHTML = `<p><strong>Assignments:</strong> ${this.allocationText(this.allocation)}</p><p><strong>Total workers:</strong> ${TASK_IDS.reduce((sum, id) => sum + (this.allocation[id] ?? 0), 0)}</p><dl class="cost-list"><div><dt>Regular labor</dt><dd>${money(costs.regularLabor)}</dd></div>${this.chargeCostRow("Fifth-worker premium", costs.fifthWorkerPremium)}${this.chargeCostRow("Crashing", costs.crashing)}${this.chargeCostRow("Late penalty", costs.latePenalty)}<div class="cost-total"><dt>Total</dt><dd>${money(costs.total)}</dd></div></dl>`;
     (this.root.querySelector("#review-dialog") as HTMLDialogElement).showModal();
   }
 
@@ -294,7 +313,44 @@ export class RockNBandsApp {
     this.allocationError = "";
     this.persist(true);
     this.render();
-    queueMicrotask(() => (this.root.querySelector("#update-heading, #complete-title") as HTMLElement)?.focus());
+    queueMicrotask(() => {
+      if (!this.showPendingDeadlineNotice()) this.focusCurrentWeekHeading();
+    });
+  }
+
+  private showLimitDialog(): void {
+    const dialog = this.root.querySelector<HTMLDialogElement>("#limit-dialog");
+    const message = this.root.querySelector<HTMLElement>("#limit-dialog-message");
+    if (!dialog || !message) return;
+    message.textContent = this.allocationError;
+    if (!dialog.open) dialog.showModal();
+  }
+
+  private closeLimitDialog(): void {
+    this.root.querySelector<HTMLDialogElement>("#limit-dialog")?.close();
+    this.limitReturnFocus?.focus();
+    this.limitReturnFocus = null;
+  }
+
+  private showPendingDeadlineNotice(): boolean {
+    if (this.state.phase !== "playing" || this.state.deadline !== 9 || this.state.deadlineNoticeAcknowledged) return false;
+    const dialog = this.root.querySelector<HTMLDialogElement>("#deadline-dialog");
+    if (!dialog) return false;
+    if (!dialog.open) dialog.showModal();
+    return true;
+  }
+
+  private acknowledgeDeadline(): void {
+    this.state = acknowledgeDeadlineNotice(this.state);
+    this.persist(true);
+    this.root.querySelector<HTMLDialogElement>("#deadline-dialog")?.close();
+    this.focusCurrentWeekHeading();
+  }
+
+  private focusCurrentWeekHeading(): void {
+    const heading = this.root.querySelector<HTMLElement>("#dashboard-title, #complete-title");
+    heading?.scrollIntoView({ block: "start", behavior: "auto" });
+    heading?.focus({ preventScroll: true });
   }
 
   private restart(): void {

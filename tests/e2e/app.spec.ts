@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { createInitialState, enterDebrief } from "../../src/domain/engine";
+import { commitWeek, createInitialState, enterDebrief } from "../../src/domain/engine";
 import { playFixture } from "../fixtures/fullGames";
 
 test("welcome and briefing have no automatically detectable WCAG A/AA violations", async ({ page }) => {
@@ -114,6 +114,53 @@ test("a sixth worker is rejected immediately with specific correction guidance",
   await page.reload(); await page.getByRole("button", { name: /Resume saved simulation at Week 1/ }).click();
   await page.getByRole("button", { name: "Task-list view" }).click();
   for (let index = 0; index < 3; index += 1) await page.getByRole("radio", { name: "2", exact: true }).nth(index).click();
+  const limitDialog = page.getByRole("alertdialog", { name: "Worker limit reached" });
+  await expect(limitDialog).toBeVisible();
+  await expect(limitDialog).toContainText("weekly maximum is 5");
+  await limitDialog.getByRole("button", { name: "Return to allocations" }).click();
   await expect(page.getByRole("alert")).toContainText("weekly maximum is 5");
   await expect(page.getByText("4 assigned · 1 remaining")).toBeVisible();
+});
+
+test("extra charges are identified with text and high-emphasis styling", async ({ page }) => {
+  const state = createInitialState(); state.phase = "playing";
+  await page.goto("/");
+  await page.evaluate((saved) => localStorage.setItem("rock-n-bands-state-v1", saved), JSON.stringify(state));
+  await page.reload(); await page.getByRole("button", { name: /Resume saved simulation at Week 1/ }).click();
+  await page.getByRole("radio", { name: "2", exact: true }).nth(0).click();
+  await page.getByRole("radio", { name: "2", exact: true }).nth(1).click();
+  await page.getByRole("radio", { name: "1", exact: true }).nth(2).click();
+  const preview = page.locator("#cost-preview");
+  await expect(preview.locator(".charge-active")).toHaveCount(2);
+  await expect(preview.getByText("Extra charge")).toHaveCount(2);
+  await expect(page.locator(".status-extra-charge")).toContainText("Includes extra charges");
+});
+
+test("committing a week returns focus and viewport to the new week heading", async ({ page }) => {
+  const state = createInitialState(); state.phase = "playing";
+  await page.goto("/");
+  await page.evaluate((saved) => localStorage.setItem("rock-n-bands-state-v1", saved), JSON.stringify(state));
+  await page.reload(); await page.getByRole("button", { name: /Resume saved simulation at Week 1/ }).click();
+  await page.getByRole("button", { name: "Review week" }).click();
+  await page.getByRole("button", { name: "Commit Week" }).click();
+  const heading = page.getByRole("heading", { name: "Week 2 allocation" });
+  await expect(heading).toBeFocused();
+  expect(await heading.evaluate((element) => element.getBoundingClientRect().top < 220)).toBe(true);
+});
+
+test("the revised Week 9 deadline requires acknowledgment and remains prominent", async ({ page }) => {
+  let state = createInitialState(); state.phase = "playing";
+  for (let week = 0; week < 5; week += 1) state = commitWeek(state, {});
+  await page.goto("/");
+  await page.evaluate((saved) => localStorage.setItem("rock-n-bands-state-v1", saved), JSON.stringify(state));
+  await page.reload(); await page.getByRole("button", { name: /Resume saved simulation at Week 6/ }).click();
+  const deadlineDialog = page.getByRole("alertdialog", { name: "Deadline moved forward to Week 9" });
+  await expect(deadlineDialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(deadlineDialog).toBeVisible();
+  await deadlineDialog.getByRole("button", { name: "I understand the new deadline" }).click();
+  await expect(page.getByRole("heading", { name: "Week 6 allocation" })).toBeFocused();
+  await expect(page.locator(".deadline-alert")).toContainText("Week 9");
+  await expect(page.locator(".deadline-alert")).toContainText("Revised deadline");
+  await expect(page.locator(".deadline-update")).toContainText("Deadline moved forward");
 });

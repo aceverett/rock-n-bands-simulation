@@ -4,10 +4,10 @@
 |---|---|---|
 | Correct Tasks A–L, dependencies, initial 38 worker-weeks | `src/domain/config.ts` | `engine.test.ts`: initial eligibility and 38/40 totals |
 | Atomic weekly processing and no same-week unlock | `commitWeek` in `src/domain/engine.ts` | successor-unlock unit test |
-| 0–5 workers, max 2 per task | allocation validation and native radio controls | worker-limit unit tests; browser flow |
-| Labor, fifth-worker, crashing, and late costs | `calculateCosts` | transparent-cost and late-penalty tests |
+| 0–5 workers, max 2 per task | allocation validation, native radio controls, and immediate modal limit warning | worker-limit unit tests; browser flow |
+| Labor, fifth-worker, crashing, and late costs | `calculateCosts`; text-and-icon extra-charge warnings | transparent-cost, warning-state, and late-penalty tests |
 | Correct deterministic events after Weeks 1–7 | `EVENTS` and `applyEvent` | event-order and final-configuration tests |
-| Week 5 deadline becomes Week 9 | deadline event | deadline test |
+| Week 5 deadline becomes Week 9 | deadline event, required acknowledgment dialog, and persistent revised-deadline status | deadline and browser-interaction tests |
 | Capacity Recovery restricted by historical eligibility | pending recovery and `resolveCapacityRecovery` | prohibited-target test and audit records |
 | Continue beyond Week 12 | unbounded `currentWeek` transition | engine has no week cap; late fixture coverage |
 | Welcome, briefing, and rules check | semantic views in `src/ui/app.ts` | Playwright browser flow |
