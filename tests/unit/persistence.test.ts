@@ -12,9 +12,22 @@ class MemoryStorage implements StorageLike {
 describe("persistence", () => {
   it("restores an equivalent complete game state", () => {
     const storage = new MemoryStorage();
-    const state = createInitialState(); state.initialPlan.strategy = "Balance connected paths";
+    const state = createInitialState(); state.currentWeek = 4;
     saveState(state, storage);
     expect(loadState(storage)).toEqual(state);
+  });
+
+  it("migrates a legacy planning save without retaining written responses", () => {
+    const storage = new MemoryStorage();
+    const state = createInitialState() as unknown as Record<string, unknown>;
+    state.phase = "planning";
+    state.initialPlan = { strategy: "Legacy response", allocationSketch: "Legacy sketch" };
+    state.reflections = ["One", "Two", "Three"];
+    storage.setItem(SAVE_KEY, JSON.stringify(state));
+    const restored = loadState(storage)! as unknown as Record<string, unknown>;
+    expect(restored.phase).toBe("playing");
+    expect(restored.initialPlan).toBeUndefined();
+    expect(restored.reflections).toBeUndefined();
   });
 
   it("clears only the application save key", () => {

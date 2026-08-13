@@ -2,7 +2,7 @@
 
 ## Purpose and learner experience
 
-Rock'n Bands is a mastery-oriented simulation for an asynchronous project-management course. A first attempt is designed for about 30–40 minutes without a timer. Learners independently plan, allocate workers, respond to deterministic changes, review results, and complete three ungraded reflection prompts.
+Rock'n Bands is a mastery-oriented simulation for an asynchronous project-management course. A first attempt is designed for about 30–40 minutes without a timer. Learners independently allocate workers, respond to deterministic changes, and review their results. Written reflection is intentionally left to a separate Canvas assignment.
 
 ## Corrected rules used by the application
 

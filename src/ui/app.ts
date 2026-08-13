@@ -1,6 +1,5 @@
 import { TASK_BY_ID } from "../domain/config";
 import {
-  allTasksComplete,
   beginBriefing,
   calculateCosts,
   commitWeek,
@@ -11,10 +10,8 @@ import {
   isComplete,
   lockedReason,
   resolveCapacityRecovery,
-  saveInitialPlan,
   taskStatus,
   totalCosts,
-  updateReflections,
   validateAllocation,
 } from "../domain/engine";
 import { TASK_IDS, type Allocation, type GameState, type TaskId } from "../domain/types";
@@ -29,7 +26,7 @@ export class RockNBandsApp {
   private state: GameState = createInitialState();
   private resumeCandidate: GameState | null;
   private allocation: Allocation = {};
-  private projectView: "network" | "list" = "network";
+  private projectView: "network" | "list" = "list";
   private rulesFeedback = false;
   private allocationError = "";
 
@@ -42,7 +39,6 @@ export class RockNBandsApp {
     this.root.addEventListener("click", (event) => this.onClick(event));
     this.root.addEventListener("change", (event) => this.onChange(event));
     this.root.addEventListener("submit", (event) => this.onSubmit(event));
-    this.root.addEventListener("input", (event) => this.onInput(event));
     window.addEventListener("beforeunload", () => this.lms.terminate());
     this.render();
   }
@@ -67,7 +63,6 @@ export class RockNBandsApp {
     switch (this.state.phase) {
       case "welcome": return this.welcomeView();
       case "briefing": return this.briefingView();
-      case "planning": return this.planningView();
       case "playing": return this.gameView();
       case "complete": return this.completionGateView();
       case "debrief": return this.debriefView();
@@ -84,7 +79,7 @@ export class RockNBandsApp {
         <button class="button button-primary" type="button" data-action="begin">Begin new simulation</button>
         ${this.resumeCandidate ? `<button class="button button-secondary" type="button" data-action="resume">Resume saved simulation at ${escapeHtml(this.resumeCandidate.phase === "playing" ? `Week ${this.resumeCandidate.currentWeek}` : this.resumeCandidate.phase)}</button>` : ""}
       </div>
-      <aside class="callout"><h2>Autosave and resume</h2><p>Your plan and every committed week are saved on this device. In Canvas SCORM mode, the same state is also saved to the LMS after each week and capacity recovery.</p></aside>
+      <aside class="callout"><h2>Autosave and resume</h2><p>Your progress and every committed week are saved on this device. In Canvas SCORM mode, the same state is also saved to the LMS after each week and capacity recovery.</p></aside>
       <section class="objectives"><h2>What you will practice</h2><ul>
         <li>Analyze dependencies and schedule-sensitive paths.</li><li>Allocate constrained workers among eligible activities.</li><li>Evaluate crashing, labor, premium, and late costs.</li><li>Revise decisions as durations and the deadline change.</li><li>Explain why whole paths matter more than isolated activities.</li>
       </ul></section>
@@ -101,23 +96,13 @@ export class RockNBandsApp {
       ${this.projectView === "network" ? networkDiagram(this.state) : dependencyTable(this.state)}
       ${this.projectView === "network" ? `<details><summary>Equivalent text-based dependency table</summary>${dependencyTable(this.state)}</details>` : ""}
       <section class="rules-check" aria-labelledby="check-title"><h2 id="check-title">Quick rules check</h2>
-      ${this.rulesFeedback ? `<div class="feedback" tabindex="-1" id="rules-feedback"><h3>Review</h3><p><strong>Week 1:</strong> A, C, and D are available. <strong>Unlocking:</strong> successors wait until the next week. <strong>Limits:</strong> 2 workers per task and 5 total.</p><button class="button button-primary" type="button" data-action="planning">Continue to initial planning</button></div>` : `<form id="rules-form">
+      ${this.rulesFeedback ? `<div class="feedback" tabindex="-1" id="rules-feedback"><h3>Review</h3><p><strong>Week 1:</strong> A, C, and D are available. <strong>Unlocking:</strong> successors wait until the next week. <strong>Limits:</strong> 2 workers per task and 5 total.</p><button class="button button-primary" type="button" data-action="start-week-one">Begin Week 1</button></div>` : `<form id="rules-form">
         <label>Which tasks are available in Week 1?<select name="eligible" required><option value="">Choose</option><option>A, C, and D</option><option>A, B, and C</option><option>All tasks</option></select></label>
         <label>If C is completed this week, when can B first receive workers?<select name="unlock" required><option value="">Choose</option><option>Immediately</option><option>Next week</option></select></label>
         <label>What are the assignment limits?<select name="limits" required><option value="">Choose</option><option>2 per task; 5 total</option><option>5 per task; no weekly limit</option></select></label>
         <button class="button button-secondary" type="submit">Check my understanding</button>
       </form>`}</section>
     </section>`;
-  }
-
-  private planningView(): string {
-    return `<section class="page-section narrow" aria-labelledby="planning-title"><p class="eyebrow">Before Week 1</p><h1 id="planning-title">Draft your initial strategy</h1>
-      <p>This is a thinking workspace, not a graded prediction. Plan ahead, but expect to revise when the project changes. Your entries will be saved for the final comparison.</p>
-      <form id="plan-form" class="stacked-form">
-        <label for="strategy">What will guide your resource decisions?</label><textarea id="strategy" name="strategy" rows="5" placeholder="For example: I will watch connected sequences of tasks and keep several routes moving.">${escapeHtml(this.state.initialPlan.strategy)}</textarea>
-        <label for="sketch">Optional allocation sketch for future weeks</label><textarea id="sketch" name="sketch" rows="7" placeholder="Record a rough week-by-week idea. You may revise this freely before starting.">${escapeHtml(this.state.initialPlan.allocationSketch)}</textarea>
-        <div class="button-row"><button class="button button-primary" type="submit">Save plan and begin Week 1</button><button class="button button-quiet" type="button" data-action="briefing">Review briefing</button></div>
-      </form></section>`;
   }
 
   private statusBar(): string {
@@ -136,12 +121,12 @@ export class RockNBandsApp {
     return `<section class="dashboard" aria-labelledby="dashboard-title">
       <div class="dashboard-heading"><div><p class="eyebrow">Festival operations</p><h1 id="dashboard-title">Week ${this.state.currentWeek} allocation</h1></div><button class="button button-quiet" type="button" data-action="restart">Restart</button></div>
       ${this.statusBar()}
-      ${this.allocationError ? `<section class="error-summary inline-error" role="alert"><h2>Allocation not changed</h2><p>${escapeHtml(this.allocationError)}</p></section>` : ""}
+      <div id="allocation-error-region">${this.allocationError ? `<section class="error-summary inline-error" role="alert"><h2>Allocation not changed</h2><p>${escapeHtml(this.allocationError)}</p></section>` : ""}</div>
       ${this.state.lastUpdate ? `<section class="project-update" aria-live="polite" aria-atomic="true"><h2 id="update-heading" tabindex="-1">Project update</h2><p>${escapeHtml(this.state.lastUpdate)}</p>${last?.event ? `<p class="event"><strong>${escapeHtml(last.event.title)}:</strong> ${escapeHtml(last.event.message)}</p>` : ""}</section>` : ""}
       ${this.state.pendingRecoveries.length ? this.recoveryView() : `<div class="dashboard-layout"><section aria-labelledby="tasks-title"><div class="section-heading"><div><h2 id="tasks-title">Project activities</h2><p>Choose 0, 1, or 2 workers for each eligible task.</p></div>${this.viewToggle()}</div>
         ${this.projectView === "network" ? networkDiagram(this.state) : this.taskCards()}
-        ${this.projectView === "network" ? `<details class="task-controls"><summary>Open task allocation controls</summary>${this.taskCards()}</details>` : ""}
-      </section><aside class="commit-panel" aria-labelledby="cost-title">${this.costPreview()}<button class="button button-primary button-block" type="button" data-action="review">Review week</button><p class="fine-print">Nothing is processed until you review and commit the entire week.</p></aside></div>`}
+        ${this.projectView === "network" ? `<details class="task-controls"><summary><span class="task-controls-kicker">Required action</span><strong>Open allocation controls</strong><span>Select workers for eligible tasks before reviewing the week.</span></summary>${this.taskCards()}</details>` : ""}
+      </section><aside class="commit-panel" aria-labelledby="cost-title"><div id="cost-preview">${this.costPreview()}</div><button class="button button-primary button-block" type="button" data-action="review">Review week</button><p class="fine-print">Nothing is processed until you review and commit the entire week.</p></aside></div>`}
       ${this.logView()}
       <dialog id="review-dialog" aria-labelledby="review-title"><div class="dialog-inner"><h2 id="review-title">Review Week ${this.state.currentWeek}</h2><div id="review-content"></div><div class="button-row"><button class="button button-primary" type="button" data-action="commit">Commit Week</button><button class="button button-secondary" type="button" data-action="close-review">Return to allocations</button></div></div></dialog>
     </section>`;
@@ -196,13 +181,9 @@ export class RockNBandsApp {
     return `<section class="results" aria-labelledby="results-title"><p class="eyebrow">Results and debrief</p><h1 id="results-title">Project complete</h1>
       <section class="result-cards" aria-label="Project results"><div><span>Completion</span><strong>Week ${completionWeek}</strong></div><div><span>Schedule</span><strong>${completionWeek <= this.state.deadline ? "On time" : "Late"}</strong></div><div><span>Total cost</span><strong>${money(totals.total)}</strong></div></section>
       <section class="results-grid"><article><h2>Cost breakdown</h2><dl class="cost-list"><div><dt>Regular labor</dt><dd>${money(totals.regularLabor)}</dd></div><div><dt>Fifth-worker premiums</dt><dd>${money(totals.fifthWorkerPremium)}</dd></div><div><dt>Crashing costs</dt><dd>${money(totals.crashing)}</dd></div><div><dt>Late penalties</dt><dd>${money(totals.latePenalty)}</dd></div></dl></article>
-      <article><h2>Plan compared with action</h2><h3>Initial strategy</h3><p>${escapeHtml(this.state.initialPlan.strategy) || "No strategy recorded."}</p><h3>Allocation sketch</h3><p class="pre-wrap">${escapeHtml(this.state.initialPlan.allocationSketch) || "No sketch recorded."}</p><p>You committed ${this.state.history.length} weekly allocation${this.state.history.length === 1 ? "" : "s"} and made ${this.state.recoveries.length} capacity recovery adjustment${this.state.recoveries.length === 1 ? "" : "s"}.</p></article></section>
+      <article><h2>Decision summary</h2><dl class="cost-list"><div><dt>Weeks committed</dt><dd>${this.state.history.length}</dd></div><div><dt>Capacity recoveries</dt><dd>${this.state.recoveries.length}</dd></div><div><dt>Tasks completed</dt><dd>12 of 12</dd></div><div><dt>Final deadline</dt><dd>Week ${this.state.deadline}</dd></div></dl></article></section>
       <section class="debrief"><h2>What the network reveals</h2><p>The initial critical path was <strong>D–F–I</strong> at 12 uncompressed weeks. The deterministic changes increased that same path to 16 uncompressed weeks: D grew to 4, F to 5, and I to 7 worker-weeks.</p><p>That path deserved attention, but it was not the only schedule risk. Work on A–E–G–K, C–B–J, D–H–J, and D–F–L still controlled when downstream tasks could start. Balancing expected completion times across connected paths can therefore outperform reacting to whichever isolated task looks longest.</p><p>Using extra workers early can buy schedule flexibility, but it also adds fifth-worker and coordination costs. Waiting may save those costs in the short run while increasing exposure to $2,000 late rounds. Uncertainty makes an initial plan useful as a hypothesis—not a promise.</p></section>
       <section aria-labelledby="history-title"><h2 id="history-title">Week-by-week history</h2>${this.historyTable()}</section>
-      <section class="reflections" aria-labelledby="reflection-title"><h2 id="reflection-title">Reflection</h2><p>Your responses are recorded for completion; they are not automatically graded for meaning.</p><form id="reflection-form" class="stacked-form">
-        ${["Which path or group of tasks received most of your attention, and why?", "Which event caused the largest change in your strategy?", "If you played again, what would you change about your early resource allocations?"].map((prompt, index) => `<label for="reflection-${index}">${index + 1}. ${prompt}</label><textarea id="reflection-${index}" name="reflection-${index}" rows="3">${escapeHtml(this.state.reflections[index] ?? "")}</textarea>`).join("")}
-        <button class="button button-secondary" type="submit">Save reflections</button><p id="reflection-status" role="status"></p>
-      </form></section>
       <div class="button-row print-actions"><button class="button button-secondary" type="button" data-action="download">Download readable summary</button><button class="button button-secondary" type="button" data-action="print">Print results</button><button class="button button-quiet" type="button" data-action="restart">Restart simulation</button>${referrer ? `<a class="button button-primary" href="${escapeHtml(referrer)}" target="_top">Return to Canvas</a>` : ""}</div>
       ${!referrer ? `<p class="fine-print">No Canvas return address is available in this standalone session. Close this tab or use your browser's Back control.</p>` : ""}
     </section>`;
@@ -234,7 +215,7 @@ export class RockNBandsApp {
     if (action === "begin") this.beginNew();
     if (action === "resume" && this.resumeCandidate) { this.state = this.resumeCandidate; this.allocation = {}; this.render(); }
     if (action === "briefing") { this.state.phase = "briefing"; this.render(); }
-    if (action === "planning") { this.state = completeRulesCheck(this.state); this.persist(); this.render(); }
+    if (action === "start-week-one") { this.state = completeRulesCheck(this.state); this.persist(true); this.allocation = {}; this.render(); }
     if (action === "view-network") { this.projectView = "network"; this.render(); }
     if (action === "view-list") { this.projectView = "list"; this.render(); }
     if (action === "review") this.openReview();
@@ -250,48 +231,42 @@ export class RockNBandsApp {
     const input = event.target as HTMLInputElement;
     if (input.name.startsWith("task-")) {
       const id = input.name.slice(5) as TaskId;
+      const previous = Number(this.allocation[id] ?? 0);
       const candidate = { ...this.allocation, [id]: Number(input.value) };
       if (candidate[id] === 0) delete candidate[id];
       const total = TASK_IDS.reduce((sum, taskId) => sum + (candidate[taskId] ?? 0), 0);
       if (total > 5) {
         this.allocationError = `That choice would assign ${total} workers. Reduce another task first; the weekly maximum is 5.`;
+        input.checked = false;
+        const previousInput = this.root.querySelector<HTMLInputElement>(`input[name="task-${id}"][value="${previous}"]`);
+        if (previousInput) previousInput.checked = true;
       } else {
         this.allocation = candidate;
         this.allocationError = "";
       }
-      this.render();
+      this.refreshAllocationSummary();
     }
   }
 
-  private onInput(event: Event): void {
-    if (this.state.phase !== "planning") return;
-    const input = event.target as HTMLTextAreaElement;
-    if (input.name === "strategy") this.state.initialPlan.strategy = input.value;
-    if (input.name === "sketch") this.state.initialPlan.allocationSketch = input.value;
-    this.persist();
+  private refreshAllocationSummary(): void {
+    const status = this.root.querySelector<HTMLElement>(".status-bar");
+    if (status) status.outerHTML = this.statusBar();
+    const costPreview = this.root.querySelector<HTMLElement>("#cost-preview");
+    if (costPreview) costPreview.innerHTML = this.costPreview();
+    const errorRegion = this.root.querySelector<HTMLElement>("#allocation-error-region");
+    if (errorRegion) errorRegion.innerHTML = this.allocationError ? `<section class="error-summary inline-error" role="alert"><h2>Allocation not changed</h2><p>${escapeHtml(this.allocationError)}</p></section>` : "";
   }
 
   private onSubmit(event: SubmitEvent): void {
     const form = event.target as HTMLFormElement;
     event.preventDefault();
     if (form.id === "rules-form") { this.rulesFeedback = true; this.render(); queueMicrotask(() => (this.root.querySelector("#rules-feedback") as HTMLElement)?.focus()); }
-    if (form.id === "plan-form") {
-      const data = new FormData(form);
-      this.state = saveInitialPlan(this.state, String(data.get("strategy") ?? ""), String(data.get("sketch") ?? ""));
-      this.persist(true); this.allocation = {}; this.render();
-    }
     if (form.id === "recovery-form") {
       const value = String(new FormData(form).get("target") ?? "");
       if (!value) return;
       this.state = resolveCapacityRecovery(this.state, value === "unused" ? undefined : value as TaskId);
       this.persist(true); this.render();
       queueMicrotask(() => (this.root.querySelector("#update-heading") as HTMLElement)?.focus());
-    }
-    if (form.id === "reflection-form") {
-      const data = new FormData(form);
-      this.state = updateReflections(this.state, [0, 1, 2].map((index) => String(data.get(`reflection-${index}`) ?? "")) as [string, string, string]);
-      this.persist(true); this.lms.complete(this.state);
-      const status = this.root.querySelector("#reflection-status"); if (status) status.textContent = "Reflections saved.";
     }
   }
 
@@ -323,13 +298,13 @@ export class RockNBandsApp {
   }
 
   private restart(): void {
-    if (!window.confirm("Restart the simulation? This clears the saved project, plan, history, and reflections.")) return;
+    if (!window.confirm("Restart the simulation? This clears the saved project and allocation history.")) return;
     clearState(); this.state = createInitialState(); this.resumeCandidate = null; this.allocation = {}; this.rulesFeedback = false; this.render();
   }
 
   private downloadSummary(): void {
     const totals = totalCosts(this.state);
-    const text = ["ROCK'N BANDS — PROJECT RESULTS", "", `Completion week: ${this.state.history.at(-1)?.week ?? 0}`, `Deadline: Week ${this.state.deadline}`, `Total cost: ${money(totals.total)}`, `Regular labor: ${money(totals.regularLabor)}`, `Fifth-worker premiums: ${money(totals.fifthWorkerPremium)}`, `Crashing costs: ${money(totals.crashing)}`, `Late penalties: ${money(totals.latePenalty)}`, "", "INITIAL PLAN", this.state.initialPlan.strategy || "Not recorded", this.state.initialPlan.allocationSketch || "Not recorded", "", "WEEK-BY-WEEK HISTORY", ...this.state.history.map((record) => `Week ${record.week}: ${this.allocationText(record.allocations)}; completed ${record.completedTasks.join(", ") || "none"}; cost ${money(record.costs.total)}${record.event ? `; update: ${record.event.message}` : ""}`), "", "REFLECTIONS", ...this.state.reflections.map((reflection, index) => `${index + 1}. ${reflection || "Not recorded"}`), "", "Designed by Ken Klassen, Brock University, and Keith Willoughby, Bucknell University.", "Educational use permitted; may not be sold; original developers must be acknowledged."].join("\n");
+    const text = ["ROCK'N BANDS — PROJECT RESULTS", "", `Completion week: ${this.state.history.at(-1)?.week ?? 0}`, `Deadline: Week ${this.state.deadline}`, `Total cost: ${money(totals.total)}`, `Regular labor: ${money(totals.regularLabor)}`, `Fifth-worker premiums: ${money(totals.fifthWorkerPremium)}`, `Crashing costs: ${money(totals.crashing)}`, `Late penalties: ${money(totals.latePenalty)}`, "", "WEEK-BY-WEEK HISTORY", ...this.state.history.map((record) => `Week ${record.week}: ${this.allocationText(record.allocations)}; completed ${record.completedTasks.join(", ") || "none"}; cost ${money(record.costs.total)}${record.event ? `; update: ${record.event.message}` : ""}`), "", "Designed by Ken Klassen, Brock University, and Keith Willoughby, Bucknell University.", "Educational use permitted; may not be sold; original developers must be acknowledged."].join("\n");
     const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
     const anchor = document.createElement("a"); anchor.href = url; anchor.download = "rock-n-bands-results.txt"; anchor.click(); URL.revokeObjectURL(url);
   }

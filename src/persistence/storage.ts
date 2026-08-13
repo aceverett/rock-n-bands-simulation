@@ -12,13 +12,21 @@ export function saveState(state: GameState, storage: StorageLike = localStorage)
   storage.setItem(SAVE_KEY, JSON.stringify(state));
 }
 
+export function normalizeRestoredState(value: unknown): GameState | null {
+  if (!value || typeof value !== "object") return null;
+  const legacy = value as Record<string, unknown>;
+  if (legacy.version !== 1 || !legacy.tasks || !Array.isArray(legacy.history)) return null;
+  if (legacy.phase === "planning") legacy.phase = "playing";
+  delete legacy.initialPlan;
+  delete legacy.reflections;
+  return legacy as unknown as GameState;
+}
+
 export function loadState(storage: StorageLike = localStorage): GameState | null {
   const raw = storage.getItem(SAVE_KEY);
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as GameState;
-    if (parsed.version !== 1 || !parsed.tasks || !Array.isArray(parsed.history)) return null;
-    return parsed;
+    return normalizeRestoredState(JSON.parse(raw));
   } catch {
     return null;
   }

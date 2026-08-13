@@ -22,11 +22,9 @@ test("keyboard flow reaches Week 1 and restart requires confirmation", async ({ 
   await page.getByLabel("If C is completed this week, when can B first receive workers?").selectOption({ label: "Next week" });
   await page.getByLabel("What are the assignment limits?").selectOption({ label: "2 per task; 5 total" });
   await page.getByRole("button", { name: "Check my understanding" }).click();
-  await page.getByRole("button", { name: "Continue to initial planning" }).click();
-  await page.getByLabel("What will guide your resource decisions?").fill("Balance connected paths.");
-  await page.getByRole("button", { name: "Save plan and begin Week 1" }).click();
+  await page.getByRole("button", { name: "Begin Week 1" }).click();
   await expect(page.getByRole("heading", { name: "Week 1 allocation" })).toBeVisible();
-  await page.getByRole("button", { name: "Task-list view" }).click();
+  await expect(page.getByRole("button", { name: "Task-list view" })).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/week-1-desktop.png", fullPage: true });
 
   page.once("dialog", (dialog) => dialog.dismiss());
@@ -56,16 +54,31 @@ test("all weekly actions and dialogs operate from the keyboard", async ({ page }
     await select.focus(); await page.keyboard.press("ArrowDown");
   }
   await page.getByRole("button", { name: "Check my understanding" }).focus(); await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Continue to initial planning" }).focus(); await page.keyboard.press("Enter");
-  await page.getByLabel("What will guide your resource decisions?").focus(); await page.keyboard.type("Balance paths and preserve flexibility.");
-  await page.getByRole("button", { name: "Save plan and begin Week 1" }).focus(); await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Begin Week 1" }).focus(); await page.keyboard.press("Enter");
 
-  await page.getByRole("button", { name: "Task-list view" }).focus(); await page.keyboard.press("Enter");
   await page.getByRole("radio", { name: "2", exact: true }).first().focus(); await page.keyboard.press("Space");
   await page.getByRole("button", { name: "Review week" }).focus(); await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "Review Week 1" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Review Week 1" })).not.toBeVisible();
+});
+
+test("network allocation controls remain open and focused after worker selections", async ({ page }) => {
+  const state = createInitialState(); state.phase = "playing";
+  await page.goto("/");
+  await page.evaluate((saved) => localStorage.setItem("rock-n-bands-state-v1", saved), JSON.stringify(state));
+  await page.reload(); await page.getByRole("button", { name: /Resume saved simulation at Week 1/ }).click();
+  await page.getByRole("button", { name: "Network view" }).click();
+  const controls = page.locator("details.task-controls");
+  await expect(controls).not.toHaveAttribute("open", "");
+  await page.getByText("Open allocation controls", { exact: true }).click();
+  await expect(controls).toHaveAttribute("open", "");
+  const taskA = page.getByRole("radio", { name: "1", exact: true }).first();
+  await taskA.click();
+  await expect(controls).toHaveAttribute("open", "");
+  await expect(taskA).toBeFocused();
+  await expect(page.getByText("1 assigned · 4 remaining")).toBeVisible();
+  await page.screenshot({ path: "test-results/network-allocation-controls.png", fullPage: true });
 });
 
 test("reflows at 320 CSS pixels and at 200 percent zoom without page-level horizontal scrolling", async ({ page }) => {
@@ -88,6 +101,7 @@ test("completed fixture resumes into an accessible debrief with all twelve tasks
   await page.getByRole("button", { name: /Resume saved simulation at debrief/ }).click();
   await expect(page.getByRole("heading", { name: "Project complete" })).toBeVisible();
   await expect(page.getByText("D–F–I", { exact: false })).toBeVisible();
+  await expect(page.locator("textarea")).toHaveCount(0);
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   expect(results.violations).toEqual([]);
   await page.screenshot({ path: "test-results/debrief-desktop.png", fullPage: true });

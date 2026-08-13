@@ -1,4 +1,5 @@
 import type { GameState } from "../domain/types";
+import { normalizeRestoredState } from "../persistence/storage";
 
 interface ScormApi {
   Initialize(parameter: string): string;
@@ -97,8 +98,7 @@ export function restoreFromScorm(adapter: LmsAdapter): GameState | null {
   const raw = adapter.loadSuspendData();
   if (!raw) return null;
   try {
-    const state = JSON.parse(raw) as GameState;
-    return state.version === 1 ? state : null;
+    return normalizeRestoredState(JSON.parse(raw));
   } catch {
     return null;
   }

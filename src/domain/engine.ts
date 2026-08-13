@@ -35,8 +35,6 @@ export function createInitialState(): GameState {
     history: [],
     recoveries: [],
     pendingRecoveries: [],
-    initialPlan: { strategy: "", allocationSketch: "" },
-    reflections: ["", "", ""],
     rulesCheckComplete: false,
   };
 }
@@ -268,13 +266,6 @@ export function beginBriefing(input: GameState): GameState {
 export function completeRulesCheck(input: GameState): GameState {
   const state = clone(input);
   state.rulesCheckComplete = true;
-  state.phase = "planning";
-  return state;
-}
-
-export function saveInitialPlan(input: GameState, strategy: string, allocationSketch: string): GameState {
-  const state = clone(input);
-  state.initialPlan = { strategy: strategy.trim(), allocationSketch: allocationSketch.trim() };
   state.phase = "playing";
   return state;
 }
@@ -283,12 +274,5 @@ export function enterDebrief(input: GameState): GameState {
   if (!allTasksComplete(input)) throw new Error("The debrief is available only after all twelve tasks are complete.");
   const state = clone(input);
   state.phase = "debrief";
-  return state;
-}
-
-export function updateReflections(input: GameState, reflections: [string, string, string]): GameState {
-  if (input.phase !== "debrief") throw new Error("Reflections are recorded in the debrief.");
-  const state = clone(input);
-  state.reflections = reflections.map((value) => value.trim()) as [string, string, string];
   return state;
 }

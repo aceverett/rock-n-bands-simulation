@@ -1,7 +1,7 @@
 export const TASK_IDS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"] as const;
 export type TaskId = (typeof TASK_IDS)[number];
 
-export type Phase = "welcome" | "briefing" | "planning" | "playing" | "complete" | "debrief";
+export type Phase = "welcome" | "briefing" | "playing" | "complete" | "debrief";
 
 export interface TaskDefinition {
   id: TaskId;
@@ -67,11 +67,6 @@ export interface PendingRecovery {
   eligibleTargets: TaskId[];
 }
 
-export interface InitialPlan {
-  strategy: string;
-  allocationSketch: string;
-}
-
 export interface GameState {
   version: 1;
   phase: Phase;
@@ -81,8 +76,6 @@ export interface GameState {
   history: WeekRecord[];
   recoveries: RecoveryRecord[];
   pendingRecoveries: PendingRecovery[];
-  initialPlan: InitialPlan;
-  reflections: [string, string, string];
   rulesCheckComplete: boolean;
   lastUpdate?: string;
 }
